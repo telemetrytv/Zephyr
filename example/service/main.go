@@ -1,10 +1,13 @@
 package main
 
 import (
+	"encoding/json"
+	"io"
+
 	"github.com/RobertWHurst/navaros"
 	"github.com/nats-io/nats.go"
 	"github.com/telemetrytv/zephyr"
-	zephyrNats "github.com/telemetrytv/zephyr/nats"
+	natsconnection "github.com/telemetrytv/zephyr/nats-connection"
 )
 
 func main() {
@@ -23,13 +26,47 @@ func main() {
 		ctx.Body = resBody
 	})
 
+	router.Post("/hello-world", func(ctx *navaros.Context) {
+		reqBody, err := io.ReadAll(ctx.RequestBodyReader())
+		if err != nil {
+			panic(err)
+		}
+		ctx.Body = reqBody
+	})
+
+	router.Get("/request-info", func(ctx *navaros.Context) {
+		body := map[string]any{
+			"method":                  ctx.Method(),
+			"path":                    ctx.Path(),
+			"url":                     ctx.URL().String(),
+			"params":                  ctx.Params(),
+			"query":                   ctx.Query(),
+			"protocol":                ctx.RequestProtocol(),
+			"protocolMajor":           ctx.RequestProtocolMajor(),
+			"protocolMinor":           ctx.RequestProtocolMinor(),
+			"headers":                 ctx.RequestHeaders(),
+			"contentLength":           ctx.RequestContentLength(),
+			"requestTransferEncoding": ctx.RequestTransferEncoding(),
+			"requestHost":             ctx.RequestHost(),
+			"requestRemoteAddress":    ctx.RequestRemoteAddress(),
+			"requestRawURI":           ctx.RequestRawURI(),
+			"requestTLS":              ctx.RequestTLS(),
+		}
+		bodyBytes, err := json.Marshal(body)
+		if err != nil {
+			panic(err)
+		}
+
+		ctx.Headers.Add("Content-Type", "application/json")
+		ctx.Body = bodyBytes
+	})
+
 	service := zephyr.Service{
 		Name:         "example-service",
 		GatewayNames: []string{"example-gateway"},
-		Connection:   zephyrNats.NewConnection(natsConn),
+		Connection:   natsconnection.NewConnection(natsConn),
 		Handler:      router,
 	}
-
 	if err := service.Start(); err != nil {
 		panic(err)
 	}

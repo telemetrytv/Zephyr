@@ -14,8 +14,14 @@ var GatewayAnnounceInterval = time.Duration((8 + rand.Intn(2))) * time.Second
 type Gateway struct {
 	Name       string
 	Connection Connection
-	Router     *navaros.Router
 	gsi        *GatewayServiceIndexer
+}
+
+func NewGateway(name string, connection Connection) *Gateway {
+	return &Gateway{
+		Name:       name,
+		Connection: connection,
+	}
 }
 
 // Announce runs a loop which sends a message to all services periodically,
@@ -52,35 +58,24 @@ func (g *Gateway) Start() error {
 
 func (g *Gateway) Stop() {
 	g.gsi = nil
-	g.Connection.UnbindServiceAnnounce()
+	g.Connection.UnbindServiceAnnounce(g.Name)
 }
 
-// ServeHTTP implements the http.Handler interface. It is provided for convenience
-// so the gateway can be used as a http.Handler. If you need more control it's
-// recommended to use gateway as a navaros.Handler instead.
 func (g *Gateway) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	if g.Router == nil {
-		g.Router = &navaros.Router{}
-		// TODO: Add some decent defaults like a 404 handler
-	}
-	g.Router.Use(g)
-	g.Router.ServeHTTP(res, req)
-}
+	method := navaros.HTTPMethodFromString(req.Method)
+	path := req.URL.Path
 
-// Handle implements the navaros.Handler interface. This is the recommended way
-// to use the gateway as it allows you to setup a navaros router to suit your
-// needs with the gateway being just one of the handlers.
-func (g *Gateway) Handle(ctx *navaros.Context) {
-	if g.gsi == nil {
-		panic("gateway not started")
-	}
-
-	serviceName, foundService := g.gsi.ResolveService(ctx.Method(), ctx.Path())
-	if !foundService {
-		ctx.Next()
+	serviceName, ok := g.gsi.ResolveService(method, path)
+	if !ok {
+		res.WriteHeader(404)
 		return
 	}
-	if err := g.Connection.DispatchToService(serviceName, ctx); err != nil {
+
+	if err := g.Connection.Dispatch(serviceName, res, req); err != nil {
 		panic(err)
 	}
+}
+
+func (g *Gateway) Handle(ctx *navaros.Context) {
+	g.ServeHTTP(ctx.ResponseWriter(), ctx.Request())
 }

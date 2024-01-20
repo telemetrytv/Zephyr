@@ -4,7 +4,6 @@ go 1.21.4
 
 require (
 	github.com/RobertWHurst/navaros v1.0.0-alpha14
-	github.com/davecgh/go-spew v1.1.1
 	github.com/nats-io/nats.go v1.31.0
 )
 

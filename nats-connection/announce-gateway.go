@@ -1,4 +1,4 @@
-package nats
+package natsconnection
 
 import (
 	"encoding/json"
@@ -8,15 +8,19 @@ import (
 )
 
 func (c *Connection) AnnounceGateway(gatewayName string, serviceDescriptors []*zephyr.ServiceDescriptor) error {
+	println("announcing gateway")
+
 	descriptorsBuf, err := json.Marshal(serviceDescriptors)
 	if err != nil {
 		return err
 	}
-	return c.Connection.Publish(namespace("gateway.announce", gatewayName), descriptorsBuf)
+	return c.NatsConnection.Publish(namespace("gateway.announce", gatewayName), descriptorsBuf)
 }
 
 func (c *Connection) BindServiceAnnounce(gatewayName string, handler func(serviceDescriptor *zephyr.ServiceDescriptor)) error {
-	serviceAnnounceSub, err := c.Connection.Subscribe(namespace("service.announce", gatewayName), func(msg *nats.Msg) {
+	serviceAnnounceSub, err := c.NatsConnection.Subscribe(namespace("service.announce", gatewayName), func(msg *nats.Msg) {
+		println("got service announce")
+
 		serviceDescriptorBuf := msg.Data
 		serviceDescriptor := &zephyr.ServiceDescriptor{}
 
@@ -30,15 +34,23 @@ func (c *Connection) BindServiceAnnounce(gatewayName string, handler func(servic
 		return err
 	}
 
-	c.onUnbindAnnounceService = func() {
-		serviceAnnounceSub.Unsubscribe()
+	unbinders, ok := c.unbindServiceAnnounce[gatewayName]
+	if !ok {
+		unbinders = []func(){}
 	}
+	unbinders = append(unbinders, func() {
+		serviceAnnounceSub.Unsubscribe()
+	})
+	c.unbindServiceAnnounce[gatewayName] = unbinders
 
 	return nil
 }
 
-func (c *Connection) UnbindServiceAnnounce() {
-	if c.onUnbindAnnounceService != nil {
-		c.onUnbindAnnounceService()
+func (c *Connection) UnbindServiceAnnounce(gatewayName string) {
+	unbinders, ok := c.unbindServiceAnnounce[gatewayName]
+	if ok {
+		for _, unbind := range unbinders {
+			unbind()
+		}
 	}
 }

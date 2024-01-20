@@ -2,15 +2,25 @@ package zephyr
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/RobertWHurst/navaros"
 )
 
 type Service struct {
-	GatewayNames []string
-	Name         string
-	Connection   Connection
-	Handler      navaros.RouterHandler
+	GatewayNames     []string
+	Name             string
+	Connection       Connection
+	RouteDescriptors []*navaros.RouteDescriptor
+	Handler          any
+}
+
+func NewService(name string, connection Connection, handler any) *Service {
+	return &Service{
+		Name:       name,
+		Connection: connection,
+		Handler:    handler,
+	}
 }
 
 func (s *Service) Start() error {
@@ -34,8 +44,10 @@ func (s *Service) Start() error {
 		}
 	}
 
-	err := s.Connection.BindDispatchFromGatewayOrService(s.Name, func(ctx *navaros.Context) {
-		s.Handler.Handle(ctx)
+	err := s.Connection.BindDispatch(s.Name, func(res http.ResponseWriter, req *http.Request) {
+		ctx := navaros.NewContextWithHandler(res, req, s.Handler)
+		ctx.Next()
+		ctx.Finalize()
 	})
 	if err != nil {
 		return err
@@ -51,8 +63,10 @@ func (s *Service) Start() error {
 }
 
 func (s *Service) Stop() {
-	s.Connection.UnbindGatewayAnnounce()
-	s.Connection.UnBindDispatchFromGatewayOrService()
+	for _, gatewayName := range s.GatewayNames {
+		s.Connection.UnbindGatewayAnnounce(gatewayName)
+	}
+	s.Connection.UnbindDispatch(s.Name)
 }
 
 func (s *Service) handleGatewayAnnounce(gatewayName string, serviceDescriptors []*ServiceDescriptor) {
@@ -71,8 +85,16 @@ func (s *Service) handleGatewayAnnounce(gatewayName string, serviceDescriptors [
 }
 
 func (s *Service) doAnnounce(gatewayName string) error {
+	routeDescriptors := s.RouteDescriptors
+
+	if routeDescriptors == nil {
+		if h, ok := s.Handler.(navaros.RouterHandler); ok {
+			routeDescriptors = h.RouteDescriptors()
+		}
+	}
+
 	return s.Connection.AnnounceService(gatewayName, &ServiceDescriptor{
 		Name:             s.Name,
-		RouteDescriptors: s.Handler.RouteDescriptors(),
+		RouteDescriptors: routeDescriptors,
 	})
 }

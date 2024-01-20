@@ -6,7 +6,7 @@ import (
 	"github.com/RobertWHurst/navaros"
 	"github.com/nats-io/nats.go"
 	"github.com/telemetrytv/zephyr"
-	zephyrNats "github.com/telemetrytv/zephyr/nats"
+	natsconnection "github.com/telemetrytv/zephyr/nats-connection"
 )
 
 func init() {
@@ -19,11 +19,7 @@ func main() {
 		panic(err)
 	}
 
-	gateway := &zephyr.Gateway{
-		Name:       "example-gateway",
-		Connection: zephyrNats.NewConnection(natsConn),
-	}
-
+	gateway := zephyr.NewGateway("example-gateway", natsconnection.NewConnection(natsConn))
 	httpServer := &http.Server{
 		Addr:    ":8080",
 		Handler: gateway,
