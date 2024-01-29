@@ -34,32 +34,32 @@ func (c *ServiceClient) Do(req *http.Request) (*http.Response, error) {
 	return responseRecorder.Result(), nil
 }
 
-func (c *ServiceClient) Get(url string) (*http.Response, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+func (c *ServiceClient) Get(servicePath string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodGet, servicePath, nil)
 	if err != nil {
 		return nil, err
 	}
 	return c.Do(req)
 }
 
-func (c *ServiceClient) Head(url string) (*http.Response, error) {
-	req, err := http.NewRequest(http.MethodHead, url, nil)
+func (c *ServiceClient) Head(servicePath string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodHead, servicePath, nil)
 	if err != nil {
 		return nil, err
 	}
 	return c.Do(req)
 }
 
-func (c *ServiceClient) Post(url string, contentType string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequest(http.MethodPost, url, body)
+func (c *ServiceClient) Post(servicePath string, contentType string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodPost, servicePath, body)
 	if err != nil {
 		return nil, err
 	}
 	return c.Do(req)
 }
 
-func (c *ServiceClient) PostForm(url string, data url.Values) (*http.Response, error) {
-	return c.Post(url, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
+func (c *ServiceClient) PostForm(servicePath string, data url.Values) (*http.Response, error) {
+	return c.Post(servicePath, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 }
 
 func (c *ServiceClient) ServeHTTP(w http.ResponseWriter, r *http.Request) {

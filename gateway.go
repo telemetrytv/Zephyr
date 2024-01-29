@@ -77,5 +77,16 @@ func (g *Gateway) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 }
 
 func (g *Gateway) Handle(ctx *navaros.Context) {
-	g.ServeHTTP(ctx.ResponseWriter(), ctx.Request())
+	method := ctx.Method()
+	path := ctx.Path()
+
+	serviceName, ok := g.gsi.ResolveService(method, path)
+	if !ok {
+		ctx.Next()
+		return
+	}
+
+	if err := g.Connection.Dispatch(serviceName, ctx.ResponseWriter(), ctx.Request()); err != nil {
+		panic(err)
+	}
 }

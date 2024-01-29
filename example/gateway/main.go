@@ -3,15 +3,10 @@ package main
 import (
 	"net/http"
 
-	"github.com/RobertWHurst/navaros"
 	"github.com/nats-io/nats.go"
 	"github.com/telemetrytv/zephyr"
 	natsconnection "github.com/telemetrytv/zephyr/nats-connection"
 )
-
-func init() {
-	navaros.PrintHandlerErrors = true
-}
 
 func main() {
 	natsConn, err := nats.Connect("nats://localhost:4222")

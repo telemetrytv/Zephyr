@@ -14,7 +14,10 @@ import (
 )
 
 const Timeout = 30 * time.Second
-const BodyChunkSize = 1024
+const BodyChunkSize = 1024 * 16
+
+// TODO: look into messagepack and protobufs for more efficient serialization
+// Marcus mentioned something called flatbuffers from the gaming industry
 
 type TLS struct {
 	Version            uint16 `json:"version"`
@@ -170,6 +173,10 @@ func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *
 	if err != nil {
 		return err
 	}
+	if err := responseSub.Unsubscribe(); err != nil {
+		return err
+	}
+
 	response := &Response{}
 	if err := json.Unmarshal(responseMsg.Data, response); err != nil {
 		return err
@@ -201,6 +208,10 @@ func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *
 			break
 		}
 		println("got body chunk", bodyChunk.Index)
+	}
+
+	if err := responseBodySub.Unsubscribe(); err != nil {
+		return err
 	}
 
 	return nil
@@ -254,6 +265,12 @@ func (r *requestReader) Read(p []byte) (int, error) {
 			}
 
 			if _, err := r.buffer.Write(bodyChunk.Data); err != nil {
+				return 0, err
+			}
+		}
+
+		if r.hasEnded {
+			if err := r.natsSubscription.Unsubscribe(); err != nil {
 				return 0, err
 			}
 		}

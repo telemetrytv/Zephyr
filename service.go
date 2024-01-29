@@ -45,9 +45,9 @@ func (s *Service) Start() error {
 	}
 
 	err := s.Connection.BindDispatch(s.Name, func(res http.ResponseWriter, req *http.Request) {
-		ctx := navaros.NewContextWithHandler(res, req, s.Handler)
+		ctx := navaros.NewContext(res, req, s.Handler)
 		ctx.Next()
-		ctx.Finalize()
+		navaros.CtxFinalize(ctx)
 	})
 	if err != nil {
 		return err
