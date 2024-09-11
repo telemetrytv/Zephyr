@@ -1,8 +1,10 @@
 # Zephyr
 
-![Zephyr Graphic](zephyr.png)
+<p>
+  <img src="zephyr.png" align="right" width="400">
+</p>
 
-Zephyr is a microservice framework developed by the TelemetryTV team. It contains gateway logic for streams and http as well as service registration and communication
+_Zephyr is a microservice framework developed by the TelemetryTV team. It contains gateway logic for streams and http as well as service registration and communication_
 
 ## Setting up a REST Gateway
 
