@@ -12,7 +12,7 @@ type Connection struct {
 	unbindGatewayAnnounce map[string][]func()
 }
 
-func NewConnection(natsConnection *nats.Conn) zephyr.Connection {
+func New(natsConnection *nats.Conn) zephyr.Connection {
 	return &Connection{
 		NatsConnection:        natsConnection,
 		unbindDispatch:        map[string][]func(){},

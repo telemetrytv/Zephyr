@@ -4,7 +4,7 @@ import (
 	"github.com/RobertWHurst/navaros"
 	"github.com/nats-io/nats.go"
 	"github.com/telemetrytv/zephyr"
-	natsconnection "github.com/telemetrytv/zephyr/nats-connection"
+	natsconnection "github.com/telemetrytv/zephyr/connections/nats-connection"
 )
 
 func main() {
@@ -22,7 +22,7 @@ func main() {
 	service := zephyr.Service{
 		Name:         "example-service-a",
 		GatewayNames: []string{"example-gateway"},
-		Connection:   natsconnection.NewConnection(natsConn),
+		Connection:   natsconnection.New(natsConn),
 		Handler:      router,
 	}
 	if err := service.Start(); err != nil {

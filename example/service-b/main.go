@@ -4,7 +4,7 @@ import (
 	"github.com/RobertWHurst/navaros"
 	"github.com/nats-io/nats.go"
 	"github.com/telemetrytv/zephyr"
-	natsconnection "github.com/telemetrytv/zephyr/nats-connection"
+	natsconnection "github.com/telemetrytv/zephyr/connections/nats-connection"
 )
 
 func main() {
@@ -12,7 +12,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	conn := natsconnection.NewConnection(natsConn)
+	conn := natsconnection.New(natsConn)
 
 	router := &navaros.Router{}
 

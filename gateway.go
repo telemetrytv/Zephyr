@@ -56,9 +56,10 @@ func (g *Gateway) Start() error {
 	return g.Connection.AnnounceGateway(g.Name, g.gsi.ServiceDescriptors)
 }
 
-func (g *Gateway) Stop() {
+func (g *Gateway) Stop() error {
 	g.gsi = nil
 	g.Connection.UnbindServiceAnnounce(g.Name)
+	return nil
 }
 
 func (g *Gateway) ServeHTTP(res http.ResponseWriter, req *http.Request) {
