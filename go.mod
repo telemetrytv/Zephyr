@@ -4,6 +4,7 @@ go 1.21.4
 
 require (
 	github.com/RobertWHurst/navaros v1.0.0-beta-9
+	github.com/coder/websocket v1.8.12
 	github.com/nats-io/nats.go v1.31.0
 )
 

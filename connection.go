@@ -2,6 +2,8 @@ package zephyr
 
 import (
 	"net/http"
+
+	"github.com/coder/websocket"
 )
 
 type Connection interface {
@@ -16,4 +18,7 @@ type Connection interface {
 	Dispatch(serviceName string, res http.ResponseWriter, req *http.Request) error
 	BindDispatch(serviceName string, handler func(res http.ResponseWriter, req *http.Request)) error
 	UnbindDispatch(serviceName string)
+
+	AttachSocketConnection(serviceName string, webSocketConnection *websocket.Conn) error
+	BindSocketConnections(serviceName string, handler func(webSocketConnection *websocket.Conn)) error
 }

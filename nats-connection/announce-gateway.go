@@ -8,8 +8,6 @@ import (
 )
 
 func (c *Connection) AnnounceGateway(gatewayName string, serviceDescriptors []*zephyr.ServiceDescriptor) error {
-	println("announcing gateway")
-
 	descriptorsBuf, err := json.Marshal(serviceDescriptors)
 	if err != nil {
 		return err
@@ -19,8 +17,6 @@ func (c *Connection) AnnounceGateway(gatewayName string, serviceDescriptors []*z
 
 func (c *Connection) BindServiceAnnounce(gatewayName string, handler func(serviceDescriptor *zephyr.ServiceDescriptor)) error {
 	serviceAnnounceSub, err := c.NatsConnection.Subscribe(namespace("service.announce", gatewayName), func(msg *nats.Msg) {
-		println("got service announce")
-
 		serviceDescriptorBuf := msg.Data
 		serviceDescriptor := &zephyr.ServiceDescriptor{}
 

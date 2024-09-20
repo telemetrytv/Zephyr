@@ -7,14 +7,17 @@ import (
 	"time"
 
 	"github.com/RobertWHurst/navaros"
+	"github.com/coder/websocket"
 )
 
 var GatewayAnnounceInterval = time.Duration((8 + rand.Intn(2))) * time.Second
 
 type Gateway struct {
-	Name       string
-	Connection Connection
-	gsi        *GatewayServiceIndexer
+	Name                   string
+	Connection             Connection
+	AllowWebSockets        bool
+	AcceptWebSocketOrigins []string
+	gsi                    *GatewayServiceIndexer
 }
 
 func NewGateway(name string, connection Connection) *Gateway {
@@ -62,12 +65,13 @@ func (g *Gateway) Stop() {
 }
 
 func (g *Gateway) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	method := navaros.HTTPMethodFromString(req.Method)
-	path := req.URL.Path
-
-	serviceName, ok := g.gsi.ResolveService(method, path)
+	serviceName, ok := g.gsi.ResolveService(navaros.HTTPMethodFromString(req.Method), req.URL.Path)
 	if !ok {
 		res.WriteHeader(404)
+		return
+	}
+
+	if g.tryUpgradeIfWebSocketRequest(res, req) {
 		return
 	}
 
@@ -77,16 +81,60 @@ func (g *Gateway) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 }
 
 func (g *Gateway) Handle(ctx *navaros.Context) {
-	method := ctx.Method()
-	path := ctx.Path()
-
-	serviceName, ok := g.gsi.ResolveService(method, path)
+	serviceName, ok := g.gsi.ResolveService(ctx.Method(), ctx.Path())
 	if !ok {
 		ctx.Next()
+		return
+	}
+
+	if g.tryUpgradeIfWebSocketRequest(ctx.ResponseWriter(), ctx.Request()) {
 		return
 	}
 
 	if err := g.Connection.Dispatch(serviceName, ctx.ResponseWriter(), ctx.Request()); err != nil {
 		panic(err)
 	}
+}
+
+func (g *Gateway) CanServeHTTP(req *http.Request) bool {
+	method := navaros.HTTPMethodFromString(req.Method)
+	path := req.URL.Path
+	_, ok := g.gsi.ResolveService(method, path)
+	return ok
+}
+
+func (g *Gateway) CanHandle(ctx *navaros.Context) bool {
+	method := ctx.Method()
+	path := ctx.Path()
+	_, ok := g.gsi.ResolveService(method, path)
+	return ok
+}
+
+func (g *Gateway) tryUpgradeIfWebSocketRequest(res http.ResponseWriter, req *http.Request) bool {
+	if !g.AllowWebSockets {
+		return false
+	}
+
+	if req.Header.Get("Connection") != "Upgrade" {
+		return false
+	}
+
+	method := navaros.HTTPMethodFromString(req.Method)
+	path := req.URL.Path
+	serviceName, ok := g.gsi.ResolveService(method, path)
+	if !ok {
+		return false
+	}
+
+	conn, err := websocket.Accept(res, req, &websocket.AcceptOptions{
+		OriginPatterns: g.AcceptWebSocketOrigins,
+	})
+	if err != nil {
+		panic(err)
+	}
+	if err := g.Connection.AttachSocketConnection(serviceName, conn); err != nil {
+		panic(err)
+	}
+
+	return true
 }

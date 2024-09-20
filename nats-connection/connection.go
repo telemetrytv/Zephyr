@@ -6,17 +6,19 @@ import (
 )
 
 type Connection struct {
-	NatsConnection        *nats.Conn
-	unbindDispatch        map[string][]func()
-	unbindServiceAnnounce map[string][]func()
-	unbindGatewayAnnounce map[string][]func()
+	NatsConnection          *nats.Conn
+	unbindDispatch          map[string][]func()
+	unbindServiceAnnounce   map[string][]func()
+	unbindGatewayAnnounce   map[string][]func()
+	unbindSocketConnections map[string][]func()
 }
 
 func NewConnection(natsConnection *nats.Conn) zephyr.Connection {
 	return &Connection{
-		NatsConnection:        natsConnection,
-		unbindDispatch:        map[string][]func(){},
-		unbindServiceAnnounce: map[string][]func(){},
-		unbindGatewayAnnounce: map[string][]func(){},
+		NatsConnection:          natsConnection,
+		unbindDispatch:          map[string][]func(){},
+		unbindServiceAnnounce:   map[string][]func(){},
+		unbindGatewayAnnounce:   map[string][]func(){},
+		unbindSocketConnections: map[string][]func(){},
 	}
 }

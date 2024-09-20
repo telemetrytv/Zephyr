@@ -77,7 +77,7 @@ type BodyChunk struct {
 }
 
 func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *http.Request) error {
-	requestSubject := namespace("service", serviceName)
+	requestSubject := namespace("service.dispatch", serviceName)
 	responseSubject := nats.NewInbox()
 	responseBodySubject := nats.NewInbox()
 
@@ -218,7 +218,7 @@ func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *
 }
 
 func (c *Connection) BindDispatch(serviceName string, handler func(res http.ResponseWriter, req *http.Request)) error {
-	dispatchSubject := namespace("service", serviceName)
+	dispatchSubject := namespace("service.dispatch", serviceName)
 	sub, err := c.NatsConnection.QueueSubscribe(dispatchSubject, dispatchSubject, func(msg *nats.Msg) {
 		if err := c.handleDispatch(msg, handler); err != nil {
 			panic(err)
