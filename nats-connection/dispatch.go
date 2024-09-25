@@ -13,8 +13,8 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-const Timeout = 30 * time.Second
-const BodyChunkSize = 1024 * 16
+const DispatchTimeout = 30 * time.Second
+const DispatchBodyChunkSize = 1024 * 16
 
 // TODO: look into messagepack and protobufs for more efficient serialization
 // Marcus mentioned something called flatbuffers from the gaming industry
@@ -81,7 +81,6 @@ func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *
 	responseSubject := nats.NewInbox()
 	responseBodySubject := nats.NewInbox()
 
-	println("dispatching request")
 	request := &Request{
 		Method:           req.Method,
 		URL:              req.URL.String(),
@@ -128,7 +127,7 @@ func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *
 		return err
 	}
 
-	requestAckMsg, err := c.NatsConnection.Request(requestSubject, requestBytes, Timeout)
+	requestAckMsg, err := c.NatsConnection.Request(requestSubject, requestBytes, DispatchTimeout)
 	if err != nil {
 		return err
 	}
@@ -140,7 +139,7 @@ func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *
 	requestBodySubject := requestAck.RequestBodySubject
 
 	for i := 0; true; i += 1 {
-		requestBodyBytes := make([]byte, BodyChunkSize)
+		requestBodyBytes := make([]byte, DispatchBodyChunkSize)
 		lenRead, err := req.Body.Read(requestBodyBytes)
 		isEOF := err == io.EOF
 		if !isEOF && err != nil {
@@ -169,7 +168,7 @@ func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *
 		}
 	}
 
-	responseMsg, err := responseSub.NextMsg(Timeout)
+	responseMsg, err := responseSub.NextMsg(DispatchTimeout)
 	if err != nil {
 		return err
 	}
@@ -189,7 +188,7 @@ func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *
 	}
 
 	for i := 0; true; i += 1 {
-		bodyChunkMsg, err := responseBodySub.NextMsg(Timeout)
+		bodyChunkMsg, err := responseBodySub.NextMsg(DispatchTimeout)
 		if err != nil {
 			return err
 		}
@@ -246,11 +245,11 @@ type requestReader struct {
 
 func (r *requestReader) Read(p []byte) (int, error) {
 	if !r.hasEnded {
-		readCount := int(math.Ceil(float64(len(p)-r.buffer.Len()) / BodyChunkSize))
+		readCount := int(math.Ceil(float64(len(p)-r.buffer.Len()) / DispatchBodyChunkSize))
 
 		// TODO: should keep track of the index
 		for i := 0; i < readCount; i += 1 {
-			bodyChunkMsg, err := r.natsSubscription.NextMsg(Timeout)
+			bodyChunkMsg, err := r.natsSubscription.NextMsg(DispatchTimeout)
 			if err != nil {
 				return 0, err
 			}
@@ -316,7 +315,7 @@ func (r *responseWriter) Write(p []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	chunkCount := int(math.Floor(float64(r.buffer.Len()) / BodyChunkSize))
+	chunkCount := int(math.Floor(float64(r.buffer.Len()) / DispatchBodyChunkSize))
 	for i := 0; i < chunkCount; i += 1 {
 		r.writeChunk()
 	}
@@ -378,7 +377,7 @@ func (r *responseWriter) ensureHeadersSent() error {
 func (r *responseWriter) writeChunk() error {
 	bodyChunkBytes, err := json.Marshal(&BodyChunk{
 		Index: r.writeIndex,
-		Data:  r.buffer.Next(BodyChunkSize),
+		Data:  r.buffer.Next(DispatchBodyChunkSize),
 	})
 	if err != nil {
 		return err

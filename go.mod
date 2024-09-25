@@ -3,12 +3,12 @@ module github.com/telemetrytv/zephyr
 go 1.21.4
 
 require (
-	github.com/RobertWHurst/navaros v1.0.0-beta-9
+	github.com/RobertWHurst/navaros v1.0.0
 	github.com/nats-io/nats.go v1.31.0
 )
 
 require (
-	github.com/grafana/regexp v0.0.0-20221123153739-15dc172cd2db // indirect
+	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc // indirect
 	github.com/klauspost/compress v1.17.0 // indirect
 	github.com/nats-io/nkeys v0.4.5 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
