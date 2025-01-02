@@ -93,7 +93,15 @@ func (g *Gateway) Handle(ctx *navaros.Context) {
 		return
 	}
 
+	// This Panic is ok because it will be caught and handled by Navaros
 	if err := g.Connection.Dispatch(serviceName, ctx.ResponseWriter(), ctx.Request()); err != nil {
 		panic(err)
 	}
+}
+
+func (g *Gateway) CanHandle(ctx *navaros.Context) bool {
+	method := ctx.Method()
+	path := ctx.Path()
+	_, ok := g.gsi.ResolveService(method, path)
+	return ok
 }
