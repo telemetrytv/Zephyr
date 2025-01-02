@@ -76,6 +76,13 @@ func (g *Gateway) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func (g *Gateway) CanServeHTTP(req *http.Request) bool {
+	method := navaros.HTTPMethodFromString(req.Method)
+	path := req.URL.Path
+	_, ok := g.gsi.ResolveService(method, path)
+	return ok
+}
+
 func (g *Gateway) Handle(ctx *navaros.Context) {
 	method := ctx.Method()
 	path := ctx.Path()
