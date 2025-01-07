@@ -186,6 +186,7 @@ func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *
 			res.Header().Add(key, value)
 		}
 	}
+	res.WriteHeader(response.StatusCode)
 
 	for i := 0; true; i += 1 {
 		bodyChunkMsg, err := responseBodySub.NextMsg(DispatchTimeout)
@@ -203,10 +204,8 @@ func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *
 		}
 
 		if bodyChunk.IsEOF {
-			println("got eof")
 			break
 		}
-		println("got body chunk", bodyChunk.Index)
 	}
 
 	if err := responseBodySub.Unsubscribe(); err != nil {
@@ -231,7 +230,11 @@ func (c *Connection) BindDispatch(serviceName string, handler func(res http.Resp
 	if !ok {
 		unbinders = []func(){}
 	}
-	unbinders = append(unbinders, func() { sub.Unsubscribe() })
+	unbinders = append(unbinders, func() {
+		if err := sub.Unsubscribe(); err != nil {
+			panic(err)
+		}
+	})
 	c.unbindDispatch[serviceName] = unbinders
 
 	return nil
@@ -317,7 +320,9 @@ func (r *responseWriter) Write(p []byte) (int, error) {
 	}
 	chunkCount := int(math.Floor(float64(r.buffer.Len()) / DispatchBodyChunkSize))
 	for i := 0; i < chunkCount; i += 1 {
-		r.writeChunk()
+		if err := r.writeChunk(); err != nil {
+			return 0, err
+		}
 	}
 	return len, nil
 }

@@ -63,7 +63,9 @@ func (c *ServiceClient) PostForm(servicePath string, data url.Values) (*http.Res
 }
 
 func (c *ServiceClient) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	c.Connection.Dispatch(c.Name, w, r)
+	if err := c.Connection.Dispatch(c.Name, w, r); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (c *ServiceClient) Handle(ctx *navaros.Context) {

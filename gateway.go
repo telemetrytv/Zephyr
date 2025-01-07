@@ -47,7 +47,9 @@ func (g *Gateway) Start() error {
 	}
 
 	err := g.Connection.BindServiceAnnounce(g.Name, func(serviceDescriptor *ServiceDescriptor) {
-		g.gsi.SetServiceDescriptor(serviceDescriptor)
+		if err := g.gsi.SetServiceDescriptor(serviceDescriptor); err != nil {
+			panic(err)
+		}
 	})
 	if err != nil {
 		return err

@@ -10,7 +10,9 @@ const NatsSubjectNamespace = "zephyr"
 func namespace(strValues ...string) string {
 	namespaceChunks := []string{NatsSubjectNamespace}
 	for _, str := range strValues {
-		namespaceChunks = append(namespaceChunks, formatForNamespace(str))
+		if str != "" {
+			namespaceChunks = append(namespaceChunks, formatForNamespace(str))
+		}
 	}
 	return strings.Join(namespaceChunks, ".")
 }

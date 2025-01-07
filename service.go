@@ -32,7 +32,7 @@ func (s *Service) Start() error {
 	}
 
 	if len(s.GatewayNames) == 0 {
-		s.GatewayNames = []string{"*"}
+		s.GatewayNames = []string{""}
 	}
 
 	for _, gatewayName := range s.GatewayNames {

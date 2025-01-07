@@ -15,35 +15,46 @@ func (c *Connection) AnnounceService(gatewayName string, serviceDescriptor *zeph
 	return c.NatsConnection.Publish(namespace("service.announce", gatewayName), descriptorBuf)
 }
 
-func (c *Connection) BindGatewayAnnounce(gatewayName string, handler func(serviceDescriptors []*zephyr.ServiceDescriptor)) error {
-	gatewayAnnounceSub, err := c.NatsConnection.Subscribe(namespace("gateway.announce", gatewayName), func(msg *nats.Msg) {
-		gatewayServiceDescriptorsBuf := msg.Data
-		gatewayServiceDescriptors := []*zephyr.ServiceDescriptor{}
+func (c *Connection) BindServiceAnnounce(gatewayName string, handler func(serviceDescriptor *zephyr.ServiceDescriptor)) error {
+	subHandler := func(msg *nats.Msg) {
+		serviceDescriptorBuf := msg.Data
+		serviceDescriptor := &zephyr.ServiceDescriptor{}
 
-		if err := json.Unmarshal(gatewayServiceDescriptorsBuf, &gatewayServiceDescriptors); err != nil {
+		if err := json.Unmarshal(serviceDescriptorBuf, &serviceDescriptor); err != nil {
 			panic(err)
 		}
 
-		handler(gatewayServiceDescriptors)
-	})
+		handler(serviceDescriptor)
+	}
+
+	serviceAnnounceSub, err := c.NatsConnection.Subscribe(namespace("service.announce"), subHandler)
+	if err != nil {
+		return err
+	}
+	namespacedServiceAnnounceSub, err := c.NatsConnection.Subscribe(namespace("service.announce", gatewayName), subHandler)
 	if err != nil {
 		return err
 	}
 
-	unbinders, ok := c.unbindGatewayAnnounce[gatewayName]
+	unbinders, ok := c.unbindServiceAnnounce[gatewayName]
 	if !ok {
 		unbinders = []func(){}
 	}
 	unbinders = append(unbinders, func() {
-		gatewayAnnounceSub.Unsubscribe()
+		if err := serviceAnnounceSub.Unsubscribe(); err != nil {
+			panic(err)
+		}
+		if err := namespacedServiceAnnounceSub.Unsubscribe(); err != nil {
+			panic(err)
+		}
 	})
-	c.unbindGatewayAnnounce[gatewayName] = unbinders
+	c.unbindServiceAnnounce[gatewayName] = unbinders
 
 	return nil
 }
 
-func (c *Connection) UnbindGatewayAnnounce(gatewayName string) {
-	unbinders, ok := c.unbindGatewayAnnounce[gatewayName]
+func (c *Connection) UnbindServiceAnnounce(gatewayName string) {
+	unbinders, ok := c.unbindServiceAnnounce[gatewayName]
 	if ok {
 		for _, unbind := range unbinders {
 			unbind()
