@@ -353,7 +353,6 @@ func (r *responseWriter) End() error {
 		return err
 	}
 
-	println("writing end", r.writeIndex)
 	return r.natsConnection.Publish(r.responseBodySubject, bodyChunkBytes)
 }
 
@@ -387,7 +386,6 @@ func (r *responseWriter) writeChunk() error {
 	if err != nil {
 		return err
 	}
-	println("writing body chunk", r.writeIndex)
 	if err := r.natsConnection.Publish(r.responseBodySubject, bodyChunkBytes); err != nil {
 		return err
 	}
