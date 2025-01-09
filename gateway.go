@@ -64,7 +64,11 @@ func (g *Gateway) Stop() {
 }
 
 func (g *Gateway) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	method := navaros.HTTPMethodFromString(req.Method)
+	method, err := navaros.HTTPMethodFromString(req.Method)
+	if err != nil {
+		res.WriteHeader(400)
+	}
+
 	path := req.URL.Path
 
 	serviceName, ok := g.gsi.ResolveService(method, path)
@@ -79,7 +83,11 @@ func (g *Gateway) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 }
 
 func (g *Gateway) CanServeHTTP(req *http.Request) bool {
-	method := navaros.HTTPMethodFromString(req.Method)
+	method, err := navaros.HTTPMethodFromString(req.Method)
+	if err != nil {
+		return false
+	}
+
 	path := req.URL.Path
 	_, ok := g.gsi.ResolveService(method, path)
 	return ok

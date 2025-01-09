@@ -3,7 +3,7 @@ module github.com/telemetrytv/zephyr
 go 1.21.4
 
 require (
-	github.com/RobertWHurst/navaros v1.0.0
+	github.com/RobertWHurst/navaros v1.1.0
 	github.com/nats-io/nats.go v1.31.0
 )
 

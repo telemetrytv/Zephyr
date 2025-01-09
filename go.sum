@@ -1,5 +1,5 @@
-github.com/RobertWHurst/navaros v1.0.0 h1:qNML3txGORQrGNFMUo93cnA+hryCkWUcAGFMe0663Nc=
-github.com/RobertWHurst/navaros v1.0.0/go.mod h1:dskJ4lqGoejOtTcwzD6BQHH+2KlX6SPi5JTO91ZsIHA=
+github.com/RobertWHurst/navaros v1.1.0 h1:iP7o7JRx0XzAR78ck4FoVbUYqQY7avvWabZRP2W/Lq4=
+github.com/RobertWHurst/navaros v1.1.0/go.mod h1:dskJ4lqGoejOtTcwzD6BQHH+2KlX6SPi5JTO91ZsIHA=
 github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc h1:GN2Lv3MGO7AS6PrRoT6yV5+wkrOpcszoIsO4+4ds248=
 github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc/go.mod h1:+JKpmjMGhpgPL+rXZ5nsZieVzvarn86asRlBg4uNGnk=
 github.com/klauspost/compress v1.17.0 h1:Rnbp4K9EjcDuVuHtd0dgA4qNuv9yKDYKK1ulpJwgrqM=
