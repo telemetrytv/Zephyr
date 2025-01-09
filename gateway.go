@@ -59,11 +59,19 @@ func (g *Gateway) Start() error {
 }
 
 func (g *Gateway) Stop() {
+	if g.gsi == nil {
+		return
+	}
 	g.gsi = nil
 	g.Connection.UnbindServiceAnnounce(g.Name)
 }
 
 func (g *Gateway) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+	if g.gsi == nil {
+		res.WriteHeader(503)
+		return
+	}
+
 	method, err := navaros.HTTPMethodFromString(req.Method)
 	if err != nil {
 		res.WriteHeader(400)
@@ -83,6 +91,10 @@ func (g *Gateway) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 }
 
 func (g *Gateway) CanServeHTTP(req *http.Request) bool {
+	if g.gsi == nil {
+		return false
+	}
+
 	method, err := navaros.HTTPMethodFromString(req.Method)
 	if err != nil {
 		return false
@@ -94,6 +106,11 @@ func (g *Gateway) CanServeHTTP(req *http.Request) bool {
 }
 
 func (g *Gateway) Handle(ctx *navaros.Context) {
+	if g.gsi == nil {
+		ctx.Next()
+		return
+	}
+
 	method := ctx.Method()
 	path := ctx.Path()
 
@@ -110,6 +127,10 @@ func (g *Gateway) Handle(ctx *navaros.Context) {
 }
 
 func (g *Gateway) CanHandle(ctx *navaros.Context) bool {
+	if g.gsi == nil {
+		return false
+	}
+
 	method := ctx.Method()
 	path := ctx.Path()
 	_, ok := g.gsi.ResolveService(method, path)
