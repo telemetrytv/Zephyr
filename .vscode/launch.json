@@ -12,11 +12,18 @@
       "program": "${workspaceFolder}/example/gateway/main.go",
     },
     {
-      "name": "Run Example Service",
+      "name": "Run Example Service A",
       "type": "go",
       "request": "launch",
       "mode": "auto",
-      "program": "${workspaceFolder}/example/service/main.go",
+      "program": "${workspaceFolder}/example/service-a/main.go",
+    },
+    {
+      "name": "Run Example Service B",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/example/service-b/main.go",
     }
   ]
 }

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/RobertWHurst/navaros"
 	"github.com/nats-io/nats.go"
 	"github.com/telemetrytv/zephyr"
@@ -8,26 +10,24 @@ import (
 )
 
 func main() {
+	fmt.Println("Connecting to nats")
 	natsConn, err := nats.Connect("nats://localhost:4222")
 	if err != nil {
 		panic(err)
 	}
-	conn := natstransport.New(natsConn)
+	transport := natstransport.New(natsConn)
 
-	router := &navaros.Router{}
+	fmt.Println("Creating router")
+	router := navaros.NewRouter()
 
-	client := zephyr.Client{
-		Transport: conn,
-	}
+	fmt.Println("Creating client")
+	client := zephyr.NewClient(transport)
 
+	fmt.Println("Binding client to router")
 	router.PublicGet("/leap", client.Service("example-service-a"))
 
-	service := zephyr.Service{
-		Name:         "example-service-b",
-		GatewayNames: []string{"example-gateway"},
-		Transport:    conn,
-		Handler:      router,
-	}
+	fmt.Println("Creating service")
+	service := zephyr.NewService("example-service-b", transport, router)
 	if err := service.Start(); err != nil {
 		panic(err)
 	}
