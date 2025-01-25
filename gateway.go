@@ -12,15 +12,18 @@ import (
 var GatewayAnnounceInterval = time.Duration((8 + rand.Intn(2))) * time.Second
 
 type Gateway struct {
-	Name       string
-	Connection Connection
-	gsi        *GatewayServiceIndexer
+	Name      string
+	Transport Transport
+	gsi       *GatewayServiceIndexer
 }
 
-func NewGateway(name string, connection Connection) *Gateway {
+var _ http.Handler = &Gateway{}
+var _ navaros.Handler = &Gateway{}
+
+func NewGateway(name string, transport Transport) *Gateway {
 	return &Gateway{
-		Name:       name,
-		Connection: connection,
+		Name:      name,
+		Transport: transport,
 	}
 }
 
@@ -39,14 +42,27 @@ func (g *Gateway) Start() error {
 		ServiceDescriptors: []*ServiceDescriptor{},
 	}
 
-	if g.Connection == nil {
+	if g.Transport == nil {
 		return fmt.Errorf(
 			"cannot start local service. The associated gateway already handles " +
 				"incoming requests",
 		)
 	}
 
-	err := g.Connection.BindServiceAnnounce(g.Name, func(serviceDescriptor *ServiceDescriptor) {
+	err := g.Transport.BindServiceAnnounce(func(serviceDescriptor *ServiceDescriptor) {
+		announcingToThisGateway := len(serviceDescriptor.GatewayNames) == 0
+		if !announcingToThisGateway {
+			for _, gatewayName := range serviceDescriptor.GatewayNames {
+				if gatewayName == g.Name {
+					announcingToThisGateway = true
+					break
+				}
+			}
+		}
+		if !announcingToThisGateway {
+			return
+		}
+
 		if err := g.gsi.SetServiceDescriptor(serviceDescriptor); err != nil {
 			panic(err)
 		}
@@ -55,7 +71,10 @@ func (g *Gateway) Start() error {
 		return err
 	}
 
-	return g.Connection.AnnounceGateway(g.Name, g.gsi.ServiceDescriptors)
+	return g.Transport.AnnounceGateway(&GatewayDescriptor{
+		Name:               g.Name,
+		ServiceDescriptors: g.gsi.ServiceDescriptors,
+	})
 }
 
 func (g *Gateway) Stop() {
@@ -63,7 +82,9 @@ func (g *Gateway) Stop() {
 		return
 	}
 	g.gsi = nil
-	g.Connection.UnbindServiceAnnounce(g.Name)
+	if err := g.Transport.UnbindServiceAnnounce(); err != nil {
+		panic(err)
+	}
 }
 
 func (g *Gateway) ServeHTTP(res http.ResponseWriter, req *http.Request) {
@@ -85,7 +106,7 @@ func (g *Gateway) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := g.Connection.Dispatch(serviceName, res, req); err != nil {
+	if err := g.Transport.Dispatch(serviceName, res, req); err != nil {
 		panic(err)
 	}
 }
@@ -121,7 +142,7 @@ func (g *Gateway) Handle(ctx *navaros.Context) {
 	}
 
 	// This Panic is ok because it will be caught and handled by Navaros
-	if err := g.Connection.Dispatch(serviceName, ctx.ResponseWriter(), ctx.Request()); err != nil {
+	if err := g.Transport.Dispatch(serviceName, ctx.ResponseWriter(), ctx.Request()); err != nil {
 		panic(err)
 	}
 }

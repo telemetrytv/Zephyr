@@ -11,7 +11,13 @@ import (
 )
 
 type Client struct {
-	Connection Connection
+	Transport Transport
+}
+
+func NewClient(transport Transport) *Client {
+	return &Client{
+		Transport: transport,
+	}
 }
 
 type ServiceClient struct {
@@ -28,7 +34,7 @@ func (c *Client) Service(name string) *ServiceClient {
 
 func (c *ServiceClient) Do(req *http.Request) (*http.Response, error) {
 	responseRecorder := httptest.NewRecorder()
-	if err := c.Connection.Dispatch(c.Name, responseRecorder, req); err != nil {
+	if err := c.Transport.Dispatch(c.Name, responseRecorder, req); err != nil {
 		return nil, err
 	}
 	return responseRecorder.Result(), nil
@@ -63,7 +69,7 @@ func (c *ServiceClient) PostForm(servicePath string, data url.Values) (*http.Res
 }
 
 func (c *ServiceClient) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := c.Connection.Dispatch(c.Name, w, r); err != nil {
+	if err := c.Transport.Dispatch(c.Name, w, r); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

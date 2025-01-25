@@ -1,9 +1,8 @@
-package natsconnection
+package natstransport
 
 import (
 	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"io"
 	"math"
 	"net/http"
@@ -11,72 +10,70 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 const DispatchTimeout = 30 * time.Second
 const DispatchBodyChunkSize = 1024 * 16
 
-// TODO: look into messagepack and protobufs for more efficient serialization
-// Marcus mentioned something called flatbuffers from the gaming industry
-
 type TLS struct {
-	Version            uint16 `json:"version"`
-	HandshakeComplete  bool   `json:"handshakeComplete"`
-	DidResume          bool   `json:"didResume"`
-	CipherSuite        uint16 `json:"cipherSuite"`
-	NegotiatedProtocol string `json:"negotiatedProtocol"`
-	ServerName         string `json:"serverName"`
+	Version            uint16 `msgpack:"version"`
+	HandshakeComplete  bool   `msgpack:"handshakeComplete"`
+	DidResume          bool   `msgpack:"didResume"`
+	CipherSuite        uint16 `msgpack:"cipherSuite"`
+	NegotiatedProtocol string `msgpack:"negotiatedProtocol"`
+	ServerName         string `msgpack:"serverName"`
 	// NOTE: Due to the complexity of the certificate structures, we are not
 	//       including them in the JSON output for now.
-	// PeerCertificates            []JSONCertificate   `json:"peerCertificates"`
-	// VerifiedChains              [][]JSONCertificate `json:"verifiedChains"`
-	SignedCertificateTimestamps [][]byte `json:"signedCertificateTimestamps"`
-	OCSPResponse                []byte   `json:"ocspResponse"`
-	TLSUnique                   []byte   `json:"tlsUnique"`
+	// PeerCertificates            []JSONCertificate   `msgpack:"peerCertificates"`
+	// VerifiedChains              [][]JSONCertificate `msgpack:"verifiedChains"`
+	SignedCertificateTimestamps [][]byte `msgpack:"signedCertificateTimestamps"`
+	OCSPResponse                []byte   `msgpack:"ocspResponse"`
+	TLSUnique                   []byte   `msgpack:"tlsUnique"`
 }
 
 type Request struct {
-	Method           string              `json:"method"`
-	URL              string              `json:"url"`
-	Proto            string              `json:"proto"`
-	ProtoMajor       int                 `json:"protoMajor"`
-	ProtoMinor       int                 `json:"protoMinor"`
-	Header           map[string][]string `json:"header"`
-	ContentLength    int64               `json:"contentLength"`
-	TransferEncoding []string            `json:"transferEncoding"`
-	Host             string              `json:"host"`
-	Trailers         map[string][]string `json:"trailers"`
-	RemoteAddr       string              `json:"remoteAddr"`
-	RequestURI       string              `json:"requestURI"`
-	TLS              *TLS                `json:"tls"`
+	Method           string              `msgpack:"method"`
+	URL              string              `msgpack:"url"`
+	Proto            string              `msgpack:"proto"`
+	ProtoMajor       int                 `msgpack:"protoMajor"`
+	ProtoMinor       int                 `msgpack:"protoMinor"`
+	Header           map[string][]string `msgpack:"header"`
+	ContentLength    int64               `msgpack:"contentLength"`
+	TransferEncoding []string            `msgpack:"transferEncoding"`
+	Host             string              `msgpack:"host"`
+	Trailers         map[string][]string `msgpack:"trailers"`
+	RemoteAddr       string              `msgpack:"remoteAddr"`
+	RequestURI       string              `msgpack:"requestURI"`
+	TLS              *TLS                `msgpack:"tls"`
 
-	ResponseSubject     string `json:"responseSubject"`
-	ResponseBodySubject string `json:"responseBodySubject"`
+	ResponseSubject     string `msgpack:"responseSubject"`
+	ResponseBodySubject string `msgpack:"responseBodySubject"`
 }
 
 type RequestAck struct {
-	RequestBodySubject string `json:"requestBodySubject"`
+	RequestBodySubject string `msgpack:"requestBodySubject"`
 }
 
 type ResponseError struct {
-	Message string `json:"message"`
-	Stack   string `json:"stack"`
+	Message string `msgpack:"message"`
+	Stack   string `msgpack:"stack"`
 }
 
 type Response struct {
-	StatusCode int                 `json:"statusCode"`
-	Header     map[string][]string `json:"header"`
-	Error      string              `json:"error"`
+	StatusCode int                 `msgpack:"statusCode"`
+	Header     map[string][]string `msgpack:"header"`
+	Error      string              `msgpack:"error"`
 }
 
 type BodyChunk struct {
-	Index int    `json:"index"`
-	Data  []byte `json:"data"`
-	Error string `json:"error"`
-	IsEOF bool   `json:"end"`
+	Index int    `msgpack:"index"`
+	Data  []byte `msgpack:"data"`
+	Error string `msgpack:"error"`
+	IsEOF bool   `msgpack:"end"`
 }
 
-func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *http.Request) error {
+func (c *NatsTransport) Dispatch(serviceName string, res http.ResponseWriter, req *http.Request) error {
 	requestSubject := namespace("service", serviceName)
 	responseSubject := nats.NewInbox()
 	responseBodySubject := nats.NewInbox()
@@ -113,7 +110,7 @@ func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *
 		}
 	}
 
-	requestBytes, err := json.Marshal(request)
+	requestBytes, err := msgpack.Marshal(request)
 	if err != nil {
 		return err
 	}
@@ -132,7 +129,7 @@ func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *
 		return err
 	}
 	requestAck := &RequestAck{}
-	if err := json.Unmarshal(requestAckMsg.Data, requestAck); err != nil {
+	if err := msgpack.Unmarshal(requestAckMsg.Data, requestAck); err != nil {
 		return err
 	}
 
@@ -153,7 +150,7 @@ func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *
 		if !isEOF {
 			bodyChunk.Data = requestBodyBytes[:lenRead]
 		}
-		bodyChunkBytes, err := json.Marshal(bodyChunk)
+		bodyChunkBytes, err := msgpack.Marshal(bodyChunk)
 		if err != nil {
 			return err
 		}
@@ -177,7 +174,7 @@ func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *
 	}
 
 	response := &Response{}
-	if err := json.Unmarshal(responseMsg.Data, response); err != nil {
+	if err := msgpack.Unmarshal(responseMsg.Data, response); err != nil {
 		return err
 	}
 
@@ -195,7 +192,7 @@ func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *
 		}
 
 		bodyChunk := &BodyChunk{}
-		if err := json.Unmarshal(bodyChunkMsg.Data, bodyChunk); err != nil {
+		if err := msgpack.Unmarshal(bodyChunkMsg.Data, bodyChunk); err != nil {
 			return err
 		}
 
@@ -215,7 +212,7 @@ func (c *Connection) Dispatch(serviceName string, res http.ResponseWriter, req *
 	return nil
 }
 
-func (c *Connection) BindDispatch(serviceName string, handler func(res http.ResponseWriter, req *http.Request)) error {
+func (c *NatsTransport) BindDispatch(serviceName string, handler func(res http.ResponseWriter, req *http.Request)) error {
 	dispatchSubject := namespace("service", serviceName)
 	sub, err := c.NatsConnection.QueueSubscribe(dispatchSubject, dispatchSubject, func(msg *nats.Msg) {
 		if err := c.handleDispatch(msg, handler); err != nil {
@@ -228,12 +225,10 @@ func (c *Connection) BindDispatch(serviceName string, handler func(res http.Resp
 
 	unbinders, ok := c.unbindDispatch[serviceName]
 	if !ok {
-		unbinders = []func(){}
+		unbinders = []func() error{}
 	}
-	unbinders = append(unbinders, func() {
-		if err := sub.Unsubscribe(); err != nil {
-			panic(err)
-		}
+	unbinders = append(unbinders, func() error {
+		return sub.Unsubscribe()
 	})
 	c.unbindDispatch[serviceName] = unbinders
 
@@ -257,7 +252,7 @@ func (r *requestReader) Read(p []byte) (int, error) {
 				return 0, err
 			}
 			bodyChunk := &BodyChunk{}
-			if err := json.Unmarshal(bodyChunkMsg.Data, bodyChunk); err != nil {
+			if err := msgpack.Unmarshal(bodyChunkMsg.Data, bodyChunk); err != nil {
 				return 0, err
 			}
 
@@ -314,7 +309,7 @@ func (r *responseWriter) Write(p []byte) (int, error) {
 	if err := r.ensureHeadersSent(); err != nil {
 		return 0, err
 	}
-	len, err := r.buffer.Write(p)
+	n, err := r.buffer.Write(p)
 	if err != nil {
 		return 0, err
 	}
@@ -324,7 +319,7 @@ func (r *responseWriter) Write(p []byte) (int, error) {
 			return 0, err
 		}
 	}
-	return len, nil
+	return n, nil
 }
 
 func (r *responseWriter) WriteError(err error) {
@@ -348,7 +343,7 @@ func (r *responseWriter) End() error {
 	if r.err != nil {
 		bodyChunk.Error = r.err.Error()
 	}
-	bodyChunkBytes, err := json.Marshal(bodyChunk)
+	bodyChunkBytes, err := msgpack.Marshal(bodyChunk)
 	if err != nil {
 		return err
 	}
@@ -370,7 +365,7 @@ func (r *responseWriter) ensureHeadersSent() error {
 		StatusCode: r.statusCode,
 		Header:     headers,
 	}
-	responseBytes, err := json.Marshal(response)
+	responseBytes, err := msgpack.Marshal(response)
 	if err != nil {
 		return err
 	}
@@ -379,7 +374,7 @@ func (r *responseWriter) ensureHeadersSent() error {
 }
 
 func (r *responseWriter) writeChunk() error {
-	bodyChunkBytes, err := json.Marshal(&BodyChunk{
+	bodyChunkBytes, err := msgpack.Marshal(&BodyChunk{
 		Index: r.writeIndex,
 		Data:  r.buffer.Next(DispatchBodyChunkSize),
 	})
@@ -393,11 +388,11 @@ func (r *responseWriter) writeChunk() error {
 	return nil
 }
 
-func (c *Connection) handleDispatch(msg *nats.Msg, handler func(res http.ResponseWriter, req *http.Request)) error {
+func (c *NatsTransport) handleDispatch(msg *nats.Msg, handler func(res http.ResponseWriter, req *http.Request)) error {
 	responseBodySubject := nats.NewInbox()
 
 	request := &Request{}
-	if err := json.Unmarshal(msg.Data, request); err != nil {
+	if err := msgpack.Unmarshal(msg.Data, request); err != nil {
 		return err
 	}
 
@@ -457,7 +452,7 @@ func (c *Connection) handleDispatch(msg *nats.Msg, handler func(res http.Respons
 	requestAck := &RequestAck{
 		RequestBodySubject: responseBodySubject,
 	}
-	requestAckBytes, err := json.Marshal(requestAck)
+	requestAckBytes, err := msgpack.Marshal(requestAck)
 	if err != nil {
 		return err
 	}
@@ -482,11 +477,14 @@ func (c *Connection) handleDispatch(msg *nats.Msg, handler func(res http.Respons
 	return nil
 }
 
-func (c *Connection) UnbindDispatch(serviceName string) {
+func (c *NatsTransport) UnbindDispatch(serviceName string) error {
 	unbinders, ok := c.unbindDispatch[serviceName]
 	if ok {
 		for _, unbind := range unbinders {
-			unbind()
+			if err := unbind(); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }

@@ -10,21 +10,21 @@ every service you write feels like it's a simple web right at the edge, rather
 that behind a complex messaging system.
 
 This illusion is achieved by allowing services to declare their public routes to
-a gateway over a connection method such as NATS.
+a gateway over a transport method such as NATS.
 
 Zephyr provides three important components:
 
-- **Gateway**: Indexes services it finds via it's connection, and routes HTTP
-  requests to them. Implements go's http.Handler, so it can be used with any
-  http server.
+- **Gateway**: Indexes services it finds via the assigned transport, and routes
+  HTTP requests to them. Implements go's http.Handler, so it can be used with
+  any http server.
 - **Service**: Provides a mechanism for services to declare their public routes,
   as well as receive requests via a gateway.
 - **Client**: Used to make requests from service to service. Clients are special
   in that they provide a http client like API, and can make requests to routes
   that are not public, and are not routable from a gateway.
 
-All of these components will work provided that the connection associated with
-them use a shared network. For example, if using a NATS connection, as long as
+All of these components will work provided that the transport associated with
+them use a shared network. For example, if using a NATS transport, as long as
 all components are connected to the same NATS cluster, they will be able to
 discover and communicate with each other.
 
@@ -56,11 +56,11 @@ the gateway.
 We do this using the `zephyr.NewService` function, which takes three arguments:
 
 - The name of the service
-- A connection to use for communication
+- A transport to use for communication
 - The handler to use for incoming requests
 
 ```go
-service := zephyr.NewService("myservice", natsconnection.NewConnection(natsConn), Handler)
+service := zephyr.NewService("myservice", natstransport.New(natsConn), Handler)
 service.Run()
 ```
 
@@ -81,7 +81,7 @@ import (
 
   "github.com/nats-io/nats.go"
   "github.com/telemetrytv/zephyr"
-  "github.com/telemetrytv/zephyr/natsconnection"
+  natstransport "github.com/telemetrytv/zephyr/nats-transport"
   "github.com/RobertWHurst/navaros"
   "github.com/RobertWHurst/navaros/middleware/json"
 )
@@ -110,7 +110,7 @@ func main() {
   }
 
   // Create a new service
-  service := zephyr.NewService("myservice", natsconnection.NewConnection(conn), Router)
+  service := zephyr.NewService("myservice", natstransport.New(conn), Router)
 
   // Run the service
   if err := service.Run(); err != nil {
@@ -240,12 +240,12 @@ To create a gateway, we use the `zephyr.NewGateway` function, which takes two
 arguments:
 
 - The name of the gateway.
-- A connection to use for communication.
+- A transport to use for communication.
 
 The returned gateway can then be used as an http.Handler with go's http package.
 
 ```go
-gateway := zephyr.NewGateway("mygateway", natsconnection.NewConnection(natsConn))
+gateway := zephyr.NewGateway("mygateway", natstransport.New(natsConn))
 http.ListenAndServe(":8080", gateway)
 ```
 
@@ -264,7 +264,7 @@ import (
 
   "github.com/nats-io/nats.go"
   "github.com/telemetrytv/zephyr"
-  "github.com/telemetrytv/zephyr/natsconnection"
+  natstransport "github.com/telemetrytv/zephyr/nats-transport"
 )
 
 const natsURL = "nats://localhost:4222"
@@ -278,7 +278,7 @@ func main() {
   }
 
   // Create a new gateway
-  gateway := zephyr.NewGateway("mygateway", natsconnection.NewConnection(conn))
+  gateway := zephyr.NewGateway("mygateway", natstransport.New(conn))
 
   // Listen for requests
   if err := http.ListenAndServe(":8080", gateway); err != nil {
@@ -303,7 +303,7 @@ where the zephyr client comes in. It provides a http client like API and allows
 you to call non-public routes.
 
 ```go
-client := zephyr.NewClient(natsconnection.NewConnection(natsConn))
+client := zephyr.NewClient(natstransport.New(natsConn))
 resp, err := client.Service("myservice").Get("/item/1")
 ```
 
@@ -323,7 +323,7 @@ import (
 
   "github.com/nats-io/nats.go"
   "github.com/telemetrytv/zephyr"
-  "github.com/telemetrytv/zephyr/natsconnection"
+  natstransport "github.com/telemetrytv/zephyr/nats-transport"
 )
 
 const natsURL = "nats://localhost:4222"
@@ -343,7 +343,7 @@ func main() {
   }
 
   // Create a new client
-  client := zephyr.NewClient(natsconnection.NewConnection(conn))
+  client := zephyr.NewClient(natstransport.New(conn))
 
   // Make a request to the myservice service
   resp1, err := client.Service("myservice").Get("/item/1")

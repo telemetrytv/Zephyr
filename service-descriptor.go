@@ -8,6 +8,7 @@ import (
 
 type ServiceDescriptor struct {
 	Name             string                     `json:"name"`
+	GatewayNames     []string                   `json:"gatewayNames"`
 	RouteDescriptors []*navaros.RouteDescriptor `json:"httpRouteDescriptors"`
 	LastSeenAt       *time.Time                 `json:"-"`
 	UnreachableAt    *time.Time                 `json:"-"`

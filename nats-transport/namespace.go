@@ -1,4 +1,4 @@
-package natsconnection
+package natstransport
 
 import (
 	"strings"
