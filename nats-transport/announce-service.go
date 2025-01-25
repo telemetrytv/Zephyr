@@ -1,19 +1,13 @@
 package natstransport
 
 import (
-	"encoding/json"
-
 	"github.com/nats-io/nats.go"
 	"github.com/telemetrytv/zephyr"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
-type ServiceAnnounce struct {
-	GatewayNames      []string                  `json:"gatewayNames"`
-	ServiceDescriptor *zephyr.ServiceDescriptor `json:"serviceDescriptor"`
-}
-
 func (c *NatsTransport) AnnounceService(serviceDescriptor *zephyr.ServiceDescriptor) error {
-	serviceDescriptorBuf, err := json.Marshal(serviceDescriptor)
+	serviceDescriptorBuf, err := msgpack.Marshal(serviceDescriptor)
 	if err != nil {
 		return err
 	}
@@ -25,7 +19,7 @@ func (c *NatsTransport) BindServiceAnnounce(handler func(serviceDescriptor *zeph
 		serviceDescriptorBuf := msg.Data
 		serviceDescriptor := &zephyr.ServiceDescriptor{}
 
-		if err := json.Unmarshal(serviceDescriptorBuf, serviceDescriptor); err != nil {
+		if err := msgpack.Unmarshal(serviceDescriptorBuf, serviceDescriptor); err != nil {
 			panic(err)
 		}
 

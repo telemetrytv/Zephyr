@@ -2,15 +2,13 @@ package zephyr
 
 import (
 	"time"
-
-	"github.com/RobertWHurst/navaros"
 )
 
 type ServiceDescriptor struct {
-	Name             string                     `json:"name"`
-	GatewayNames     []string                   `json:"gatewayNames"`
-	RouteDescriptors []*navaros.RouteDescriptor `json:"httpRouteDescriptors"`
-	LastSeenAt       *time.Time                 `json:"-"`
-	UnreachableAt    *time.Time                 `json:"-"`
-	UnreachableCount int                        `json:"-"`
+	Name             string             `msgpack:"name"`
+	GatewayNames     []string           `msgpack:"gatewayNames"`
+	RouteDescriptors []*RouteDescriptor `msgpack:"httpRouteDescriptors"`
+	LastSeenAt       *time.Time         `msgpack:"-"`
+	UnreachableAt    *time.Time         `msgpack:"-"`
+	UnreachableCount int                `msgpack:"-"`
 }

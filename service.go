@@ -38,7 +38,7 @@ type Service struct {
 	// that this service can handle. If this is left empty, the service will
 	// not be routable. This is automatically populated if the handler is a
 	// Navaros router.
-	RouteDescriptors []*navaros.RouteDescriptor
+	RouteDescriptors []*RouteDescriptor
 
 	// Handler is called when a request is made to the service. This can be
 	// either a Navaros router or a standard http.Handler or http.HandlerFunc.
@@ -149,7 +149,13 @@ func (s *Service) doAnnounce() error {
 
 	if routeDescriptors == nil {
 		if h, ok := s.Handler.(navaros.RouterHandler); ok {
-			routeDescriptors = h.RouteDescriptors()
+			navarosRouteDescriptors := h.RouteDescriptors()
+			for _, navarosRouteDescriptor := range navarosRouteDescriptors {
+				routeDescriptors = append(routeDescriptors, &RouteDescriptor{
+					Method:  string(navarosRouteDescriptor.Method),
+					Pattern: navarosRouteDescriptor.Pattern,
+				})
+			}
 		}
 	}
 

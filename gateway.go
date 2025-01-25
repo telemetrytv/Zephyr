@@ -93,14 +93,7 @@ func (g *Gateway) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	method, err := navaros.HTTPMethodFromString(req.Method)
-	if err != nil {
-		res.WriteHeader(400)
-	}
-
-	path := req.URL.Path
-
-	serviceName, ok := g.gsi.ResolveService(method, path)
+	serviceName, ok := g.gsi.ResolveService(req.Method, req.URL.Path)
 	if !ok {
 		res.WriteHeader(404)
 		return
@@ -116,13 +109,7 @@ func (g *Gateway) CanServeHTTP(req *http.Request) bool {
 		return false
 	}
 
-	method, err := navaros.HTTPMethodFromString(req.Method)
-	if err != nil {
-		return false
-	}
-
-	path := req.URL.Path
-	_, ok := g.gsi.ResolveService(method, path)
+	_, ok := g.gsi.ResolveService(req.Method, req.URL.Path)
 	return ok
 }
 
@@ -135,7 +122,7 @@ func (g *Gateway) Handle(ctx *navaros.Context) {
 	method := ctx.Method()
 	path := ctx.Path()
 
-	serviceName, ok := g.gsi.ResolveService(method, path)
+	serviceName, ok := g.gsi.ResolveService(string(method), path)
 	if !ok {
 		ctx.Next()
 		return
@@ -152,8 +139,6 @@ func (g *Gateway) CanHandle(ctx *navaros.Context) bool {
 		return false
 	}
 
-	method := ctx.Method()
-	path := ctx.Path()
-	_, ok := g.gsi.ResolveService(method, path)
+	_, ok := g.gsi.ResolveService(string(ctx.Method()), ctx.Path())
 	return ok
 }

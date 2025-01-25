@@ -1,6 +1,6 @@
 package zephyr
 
 type GatewayDescriptor struct {
-	Name               string               `json:"name"`
-	ServiceDescriptors []*ServiceDescriptor `json:"serviceDescriptors"`
+	Name               string               `msgpack:"name"`
+	ServiceDescriptors []*ServiceDescriptor `msgpack:"serviceDescriptors"`
 }

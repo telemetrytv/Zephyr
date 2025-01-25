@@ -1,9 +1,5 @@
 package zephyr
 
-import (
-	"github.com/RobertWHurst/navaros"
-)
-
 type GatewayServiceIndexer struct {
 	ServiceDescriptors []*ServiceDescriptor
 }
@@ -29,7 +25,7 @@ func (r *GatewayServiceIndexer) UnsetService(name string) error {
 	return nil
 }
 
-func (r *GatewayServiceIndexer) ResolveService(method navaros.HTTPMethod, path string) (string, bool) {
+func (r *GatewayServiceIndexer) ResolveService(method string, path string) (string, bool) {
 	for _, remoteService := range r.ServiceDescriptors {
 		if remoteService.UnreachableAt != nil {
 			continue
