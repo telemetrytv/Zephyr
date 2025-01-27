@@ -1,4 +1,4 @@
-package inmemorytransport
+package localtransport
 
 import (
 	"net/http"
@@ -6,16 +6,16 @@ import (
 	"github.com/telemetrytv/zephyr"
 )
 
-type InMemoryTransport struct {
+type LocalTransport struct {
 	gatewayAnnounceHandlers []func(gatewayDescriptor *zephyr.GatewayDescriptor)
 	serviceAnnounceHandlers []func(serviceDescriptor *zephyr.ServiceDescriptor)
 	dispatchHandlers        map[string]func(responseWriter http.ResponseWriter, request *http.Request)
 }
 
-var _ zephyr.Transport = &InMemoryTransport{}
+var _ zephyr.Transport = &LocalTransport{}
 
-func New() *InMemoryTransport {
-	return &InMemoryTransport{
+func New() *LocalTransport {
+	return &LocalTransport{
 		dispatchHandlers: map[string]func(responseWriter http.ResponseWriter, request *http.Request){},
 	}
 }
