@@ -155,7 +155,6 @@ func (c *NatsTransport) Dispatch(serviceName string, res http.ResponseWriter, re
 			return err
 		}
 
-		println("sending body chunk", i)
 		if err := c.NatsConnection.Publish(requestBodySubject, bodyChunkBytes); err != nil {
 			return err
 		}
