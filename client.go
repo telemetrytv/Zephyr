@@ -10,21 +10,19 @@ import (
 	"github.com/RobertWHurst/navaros"
 )
 
+// Client can make requests to services.
 type Client struct {
 	Transport Transport
 }
 
+// NewClient creates a new client with the given transport.
 func NewClient(transport Transport) *Client {
 	return &Client{
 		Transport: transport,
 	}
 }
 
-type ServiceClient struct {
-	*Client
-	Name string
-}
-
+// Service returns a ServiceClient for the given service name.
 func (c *Client) Service(name string) *ServiceClient {
 	return &ServiceClient{
 		Client: c,
@@ -32,6 +30,14 @@ func (c *Client) Service(name string) *ServiceClient {
 	}
 }
 
+// ServiceClient is a client that can make requests to a specific service.
+// To get a ServiceClient for a specific service, call Service on a Client.
+type ServiceClient struct {
+	*Client
+	Name string
+}
+
+// Do sends an HTTP request to the service.
 func (c *ServiceClient) Do(req *http.Request) (*http.Response, error) {
 	responseRecorder := httptest.NewRecorder()
 	if err := c.Transport.Dispatch(c.Name, responseRecorder, req); err != nil {
@@ -40,6 +46,7 @@ func (c *ServiceClient) Do(req *http.Request) (*http.Response, error) {
 	return responseRecorder.Result(), nil
 }
 
+// Get sends a GET request to the service.
 func (c *ServiceClient) Get(servicePath string) (*http.Response, error) {
 	req, err := http.NewRequest(http.MethodGet, servicePath, nil)
 	if err != nil {
@@ -48,6 +55,7 @@ func (c *ServiceClient) Get(servicePath string) (*http.Response, error) {
 	return c.Do(req)
 }
 
+// Head sends a HEAD request to the service.
 func (c *ServiceClient) Head(servicePath string) (*http.Response, error) {
 	req, err := http.NewRequest(http.MethodHead, servicePath, nil)
 	if err != nil {
@@ -56,6 +64,7 @@ func (c *ServiceClient) Head(servicePath string) (*http.Response, error) {
 	return c.Do(req)
 }
 
+// Post sends a POST request to the service.
 func (c *ServiceClient) Post(servicePath string, contentType string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequest(http.MethodPost, servicePath, body)
 	if err != nil {
@@ -64,16 +73,21 @@ func (c *ServiceClient) Post(servicePath string, contentType string, body io.Rea
 	return c.Do(req)
 }
 
+// PostForm sends a POST request with form data to the service.
 func (c *ServiceClient) PostForm(servicePath string, data url.Values) (*http.Response, error) {
 	return c.Post(servicePath, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 }
 
+// ServeHTTP implements http.Handler. It allows a ServiceClient to proxy
+// requests to a service.
 func (c *ServiceClient) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := c.Transport.Dispatch(c.Name, w, r); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
+// Handle implements navaros.Handler. It allows a ServiceClient to proxy
+// requests to a service.
 func (c *ServiceClient) Handle(ctx *navaros.Context) {
 	c.ServeHTTP(ctx.ResponseWriter(), ctx.Request())
 }
