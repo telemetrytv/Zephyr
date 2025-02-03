@@ -135,9 +135,15 @@ func (c *NatsTransport) Dispatch(serviceName string, res http.ResponseWriter, re
 
 	requestBodySubject := requestAck.RequestBodySubject
 
+	// Cover the case of a nil body reader
+	reqBody := req.Body
+	if reqBody == nil {
+		reqBody = &eofReader{}
+	}
+
 	for i := 0; true; i += 1 {
 		requestBodyBytes := make([]byte, DispatchBodyChunkSize)
-		lenRead, err := req.Body.Read(requestBodyBytes)
+		lenRead, err := reqBody.Read(requestBodyBytes)
 		isEOF := err == io.EOF
 		if !isEOF && err != nil {
 			return err
@@ -485,5 +491,17 @@ func (c *NatsTransport) UnbindDispatch(serviceName string) error {
 			}
 		}
 	}
+	return nil
+}
+
+type eofReader struct{}
+
+var _ io.ReadCloser = &eofReader{}
+
+func (r *eofReader) Read(p []byte) (int, error) {
+	return 0, io.EOF
+}
+
+func (r *eofReader) Close() error {
 	return nil
 }
