@@ -179,7 +179,6 @@ func getItem(ctx *navaros.Context) {
   }
 
   if targetItem == nil {
-    ctx.Status = http.StatusNotFound
     return
   }
 
@@ -203,7 +202,6 @@ func updateItem(ctx *navaros.Context) {
   }
 
   if targetItem == nil {
-    ctx.Status = http.StatusNotFound
     return
   }
 
