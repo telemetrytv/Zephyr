@@ -13,7 +13,7 @@ import (
 	"github.com/vmihailenco/msgpack/v5"
 )
 
-const DispatchTimeout = 30 * time.Second
+const DispatchTimeout = 30 * time.Hour
 const DispatchBodyChunkSize = 1024 * 16
 
 type TLS struct {
@@ -141,7 +141,8 @@ func (c *NatsTransport) Dispatch(serviceName string, res http.ResponseWriter, re
 		reqBody = &eofReader{}
 	}
 
-	for i := 0; true; i += 1 {
+	i := 0
+	for {
 		requestBodyBytes := make([]byte, DispatchBodyChunkSize)
 		lenRead, err := reqBody.Read(requestBodyBytes)
 		isEOF := err == io.EOF
@@ -149,23 +150,38 @@ func (c *NatsTransport) Dispatch(serviceName string, res http.ResponseWriter, re
 			return err
 		}
 
-		bodyChunk := &BodyChunk{
-			Index: i,
-			IsEOF: isEOF,
-		}
-		if !isEOF {
-			bodyChunk.Data = requestBodyBytes[:lenRead]
-		}
-		bodyChunkBytes, err := msgpack.Marshal(bodyChunk)
-		if err != nil {
-			return err
-		}
+		if lenRead != 0 {
+			bodyChunk := &BodyChunk{
+				Index: i,
+				Data:  requestBodyBytes[:lenRead],
+			}
+			i += 1
 
-		if err := c.NatsConnection.Publish(requestBodySubject, bodyChunkBytes); err != nil {
-			return err
+			bodyChunkBytes, err := msgpack.Marshal(bodyChunk)
+			if err != nil {
+				return err
+			}
+
+			if err := c.NatsConnection.Publish(requestBodySubject, bodyChunkBytes); err != nil {
+				return err
+			}
 		}
 
 		if isEOF {
+			bodyChunk := &BodyChunk{
+				Index: i,
+				IsEOF: true,
+			}
+
+			bodyChunkBytes, err := msgpack.Marshal(bodyChunk)
+			if err != nil {
+				return err
+			}
+
+			if err := c.NatsConnection.Publish(requestBodySubject, bodyChunkBytes); err != nil {
+				return err
+			}
+
 			break
 		}
 	}
@@ -248,10 +264,7 @@ type requestReader struct {
 
 func (r *requestReader) Read(p []byte) (int, error) {
 	if !r.hasEnded {
-		readCount := int(math.Ceil(float64(len(p)-r.buffer.Len()) / DispatchBodyChunkSize))
-
-		// TODO: should keep track of the index
-		for i := 0; i < readCount; i += 1 {
+		for r.buffer.Len() < len(p) {
 			bodyChunkMsg, err := r.natsSubscription.NextMsg(DispatchTimeout)
 			if err != nil {
 				return 0, err
@@ -263,16 +276,13 @@ func (r *requestReader) Read(p []byte) (int, error) {
 
 			if bodyChunk.IsEOF {
 				r.hasEnded = true
+				if err := r.natsSubscription.Unsubscribe(); err != nil {
+					return 0, err
+				}
 				break
 			}
 
 			if _, err := r.buffer.Write(bodyChunk.Data); err != nil {
-				return 0, err
-			}
-		}
-
-		if r.hasEnded {
-			if err := r.natsSubscription.Unsubscribe(); err != nil {
 				return 0, err
 			}
 		}
