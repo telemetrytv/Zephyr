@@ -1,11 +1,12 @@
 module github.com/telemetrytv/zephyr
 
-go 1.21.4
+go 1.24.2
 
 require (
 	github.com/RobertWHurst/navaros v1.5.3
 	github.com/nats-io/nats.go v1.38.0
 	github.com/stretchr/testify v1.10.0
+	github.com/telemetrytv/trace v1.0.1
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 )
 

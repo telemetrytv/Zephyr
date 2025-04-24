@@ -8,6 +8,12 @@ import (
 	"strings"
 
 	"github.com/RobertWHurst/navaros"
+	"github.com/telemetrytv/trace"
+)
+
+var (
+	clientRequestDebug = trace.Bind("zephyr:client:request")
+	clientServeDebug   = trace.Bind("zephyr:client:serve")
 )
 
 // Client can make requests to services.
@@ -39,11 +45,19 @@ type ServiceClient struct {
 
 // Do sends an HTTP request to the service.
 func (c *ServiceClient) Do(req *http.Request) (*http.Response, error) {
+	clientRequestDebug.Tracef("Request to %s: %s %s", c.Name, req.Method, req.URL.Path)
+
 	responseRecorder := httptest.NewRecorder()
 	if err := c.Transport.Dispatch(c.Name, responseRecorder, req); err != nil {
+		clientRequestDebug.Tracef("Request to %s failed: %v", c.Name, err)
 		return nil, err
 	}
-	return responseRecorder.Result(), nil
+
+	response := responseRecorder.Result()
+	clientRequestDebug.Tracef("Response from %s: status=%d, contentLength=%d", 
+		c.Name, response.StatusCode, response.ContentLength)
+
+	return response, nil
 }
 
 // Get sends a GET request to the service.
@@ -81,9 +95,14 @@ func (c *ServiceClient) PostForm(servicePath string, data url.Values) (*http.Res
 // ServeHTTP implements http.Handler. It allows a ServiceClient to proxy
 // requests to a service.
 func (c *ServiceClient) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	clientServeDebug.Tracef("ServiceClient %s handling HTTP request: %s %s", c.Name, r.Method, r.URL.Path)
+
 	if err := c.Transport.Dispatch(c.Name, w, r); err != nil {
+		clientServeDebug.Tracef("Error dispatching request to %s: %v", c.Name, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+
+	clientServeDebug.Tracef("Completed handling request to %s: %s %s", c.Name, r.Method, r.URL.Path)
 }
 
 // Handle implements navaros.Handler. It allows a ServiceClient to proxy

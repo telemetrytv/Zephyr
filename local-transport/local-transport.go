@@ -3,7 +3,14 @@ package localtransport
 import (
 	"net/http"
 
+	"github.com/telemetrytv/trace"
 	"github.com/telemetrytv/zephyr"
+)
+
+var (
+	transportLocalDebug       = trace.Bind("zephyr:transport:local")
+	transportLocalDispatchDebug = trace.Bind("zephyr:transport:local:dispatch")
+	transportLocalAnnounceDebug = trace.Bind("zephyr:transport:local:announce")
 )
 
 type LocalTransport struct {
@@ -15,6 +22,7 @@ type LocalTransport struct {
 var _ zephyr.Transport = &LocalTransport{}
 
 func New() *LocalTransport {
+	transportLocalDebug.Trace("Creating new local transport")
 	return &LocalTransport{
 		dispatchHandlers: map[string]func(responseWriter http.ResponseWriter, request *http.Request){},
 	}

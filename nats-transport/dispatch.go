@@ -10,10 +10,16 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/telemetrytv/trace"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
-const DispatchTimeout = 30 * time.Hour
+var (
+	transportNatsDebug       = trace.Bind("zephyr:transport:nats")
+	transportNatsDispatchDebug = trace.Bind("zephyr:transport:nats:dispatch")
+)
+
+const DispatchTimeout = 30 * time.Second
 const DispatchBodyChunkSize = 1024 * 16
 
 type TLS struct {
@@ -74,9 +80,14 @@ type BodyChunk struct {
 }
 
 func (c *NatsTransport) Dispatch(serviceName string, res http.ResponseWriter, req *http.Request) error {
+	transportNatsDispatchDebug.Tracef("Dispatching request to service %s: %s %s", serviceName, req.Method, req.URL.Path)
+	
 	requestSubject := namespace("service", serviceName)
 	responseSubject := nats.NewInbox()
 	responseBodySubject := nats.NewInbox()
+	
+	transportNatsDispatchDebug.Tracef("Using subjects - request: %s, response: %s, responseBody: %s", 
+		requestSubject, responseSubject, responseBodySubject)
 
 	request := &Request{
 		Method:           req.Method,
@@ -97,6 +108,7 @@ func (c *NatsTransport) Dispatch(serviceName string, res http.ResponseWriter, re
 	}
 
 	if req.TLS != nil {
+		transportNatsDebug.Trace("Request uses TLS, copying TLS state")
 		request.TLS = &TLS{
 			Version:                     req.TLS.Version,
 			HandshakeComplete:           req.TLS.HandshakeComplete,
@@ -110,47 +122,64 @@ func (c *NatsTransport) Dispatch(serviceName string, res http.ResponseWriter, re
 		}
 	}
 
+	transportNatsDispatchDebug.Trace("Marshaling request")
 	requestBytes, err := msgpack.Marshal(request)
 	if err != nil {
+		transportNatsDispatchDebug.Tracef("Failed to marshal request: %v", err)
 		return err
 	}
 
+	transportNatsDispatchDebug.Tracef("Setting up response subscription to %s", responseSubject)
 	responseSub, err := c.NatsConnection.SubscribeSync(responseSubject)
 	if err != nil {
+		transportNatsDispatchDebug.Tracef("Failed to subscribe to response subject %s: %v", responseSubject, err)
 		return err
 	}
+	
+	transportNatsDispatchDebug.Tracef("Setting up response body subscription to %s", responseBodySubject)
 	responseBodySub, err := c.NatsConnection.SubscribeSync(responseBodySubject)
 	if err != nil {
+		transportNatsDispatchDebug.Tracef("Failed to subscribe to response body subject %s: %v", responseBodySubject, err)
 		return err
 	}
 
+	transportNatsDispatchDebug.Tracef("Sending request to %s", requestSubject)
 	requestAckMsg, err := c.NatsConnection.Request(requestSubject, requestBytes, DispatchTimeout)
 	if err != nil {
+		transportNatsDispatchDebug.Tracef("Request to %s failed: %v", requestSubject, err)
 		return err
 	}
+	
+	transportNatsDispatchDebug.Trace("Received acknowledgment from service")
 	requestAck := &RequestAck{}
 	if err := msgpack.Unmarshal(requestAckMsg.Data, requestAck); err != nil {
+		transportNatsDispatchDebug.Tracef("Failed to unmarshal request acknowledgment: %v", err)
 		return err
 	}
 
 	requestBodySubject := requestAck.RequestBodySubject
+	transportNatsDispatchDebug.Tracef("Using request body subject: %s", requestBodySubject)
 
 	// Cover the case of a nil body reader
 	reqBody := req.Body
 	if reqBody == nil {
+		transportNatsDispatchDebug.Trace("Request has nil body, using EOF reader")
 		reqBody = &eofReader{}
 	}
 
+	transportNatsDispatchDebug.Trace("Streaming request body")
 	i := 0
 	for {
 		requestBodyBytes := make([]byte, DispatchBodyChunkSize)
 		lenRead, err := reqBody.Read(requestBodyBytes)
 		isEOF := err == io.EOF
 		if !isEOF && err != nil {
+			transportNatsDispatchDebug.Tracef("Error reading request body: %v", err)
 			return err
 		}
 
 		if lenRead != 0 {
+			transportNatsDispatchDebug.Tracef("Sending request body chunk %d, size: %d bytes", i, lenRead)
 			bodyChunk := &BodyChunk{
 				Index: i,
 				Data:  requestBodyBytes[:lenRead],
@@ -159,15 +188,18 @@ func (c *NatsTransport) Dispatch(serviceName string, res http.ResponseWriter, re
 
 			bodyChunkBytes, err := msgpack.Marshal(bodyChunk)
 			if err != nil {
+				transportNatsDispatchDebug.Tracef("Failed to marshal request body chunk: %v", err)
 				return err
 			}
 
 			if err := c.NatsConnection.Publish(requestBodySubject, bodyChunkBytes); err != nil {
+				transportNatsDispatchDebug.Tracef("Failed to publish request body chunk: %v", err)
 				return err
 			}
 		}
 
 		if isEOF {
+			transportNatsDispatchDebug.Tracef("Sending EOF request body chunk %d", i)
 			bodyChunk := &BodyChunk{
 				Index: i,
 				IsEOF: true,
@@ -175,30 +207,41 @@ func (c *NatsTransport) Dispatch(serviceName string, res http.ResponseWriter, re
 
 			bodyChunkBytes, err := msgpack.Marshal(bodyChunk)
 			if err != nil {
+				transportNatsDispatchDebug.Tracef("Failed to marshal EOF request body chunk: %v", err)
 				return err
 			}
 
 			if err := c.NatsConnection.Publish(requestBodySubject, bodyChunkBytes); err != nil {
+				transportNatsDispatchDebug.Tracef("Failed to publish EOF request body chunk: %v", err)
 				return err
 			}
 
 			break
 		}
 	}
+	transportNatsDispatchDebug.Trace("Finished streaming request body")
 
+	transportNatsDispatchDebug.Trace("Waiting for response headers")
 	responseMsg, err := responseSub.NextMsg(DispatchTimeout)
 	if err != nil {
+		transportNatsDispatchDebug.Tracef("Error waiting for response headers: %v", err)
 		return err
 	}
+	
+	transportNatsDispatchDebug.Trace("Unsubscribing from response subject")
 	if err := responseSub.Unsubscribe(); err != nil {
+		transportNatsDispatchDebug.Tracef("Failed to unsubscribe from response subject: %v", err)
 		return err
 	}
 
+	transportNatsDispatchDebug.Trace("Unmarshaling response headers")
 	response := &Response{}
 	if err := msgpack.Unmarshal(responseMsg.Data, response); err != nil {
+		transportNatsDispatchDebug.Tracef("Failed to unmarshal response: %v", err)
 		return err
 	}
 
+	transportNatsDispatchDebug.Tracef("Setting response headers and status code: %d", response.StatusCode)
 	for key, values := range response.Header {
 		for _, value := range values {
 			res.Header().Add(key, value)
@@ -206,30 +249,39 @@ func (c *NatsTransport) Dispatch(serviceName string, res http.ResponseWriter, re
 	}
 	res.WriteHeader(response.StatusCode)
 
+	transportNatsDispatchDebug.Trace("Reading response body chunks")
 	for i := 0; true; i += 1 {
+		transportNatsDispatchDebug.Tracef("Waiting for response body chunk %d", i)
 		bodyChunkMsg, err := responseBodySub.NextMsg(DispatchTimeout)
 		if err != nil {
+			transportNatsDispatchDebug.Tracef("Error receiving response body chunk: %v", err)
 			return err
 		}
 
 		bodyChunk := &BodyChunk{}
 		if err := msgpack.Unmarshal(bodyChunkMsg.Data, bodyChunk); err != nil {
+			transportNatsDispatchDebug.Tracef("Failed to unmarshal response body chunk: %v", err)
 			return err
 		}
 
 		if _, err := res.Write(bodyChunk.Data); err != nil {
+			transportNatsDispatchDebug.Tracef("Failed to write response body chunk: %v", err)
 			return err
 		}
 
 		if bodyChunk.IsEOF {
+			transportNatsDispatchDebug.Trace("Received final body chunk (EOF)")
 			break
 		}
 	}
 
+	transportNatsDispatchDebug.Trace("Unsubscribing from response body subject")
 	if err := responseBodySub.Unsubscribe(); err != nil {
+		transportNatsDispatchDebug.Tracef("Failed to unsubscribe from response body subject: %v", err)
 		return err
 	}
 
+	transportNatsDispatchDebug.Trace("Dispatch completed successfully")
 	return nil
 }
 
@@ -404,20 +456,26 @@ func (r *responseWriter) writeChunk() error {
 }
 
 func (c *NatsTransport) handleDispatch(msg *nats.Msg, handler func(res http.ResponseWriter, req *http.Request)) error {
+	transportNatsDispatchDebug.Trace("Handling dispatched request")
 	responseBodySubject := nats.NewInbox()
 
 	request := &Request{}
 	if err := msgpack.Unmarshal(msg.Data, request); err != nil {
+		transportNatsDispatchDebug.Tracef("Failed to unmarshal request: %v", err)
 		return err
 	}
 
+	transportNatsDispatchDebug.Tracef("Received request: %s %s", request.Method, request.URL)
+	
 	reqUrl, err := url.Parse(request.URL)
 	if err != nil {
+		transportNatsDispatchDebug.Tracef("Failed to parse URL: %v", err)
 		return err
 	}
 
 	reqBodySubscription, err := c.NatsConnection.SubscribeSync(responseBodySubject)
 	if err != nil {
+		transportNatsDispatchDebug.Tracef("Failed to subscribe to request body subject: %v", err)
 		return err
 	}
 
@@ -433,6 +491,8 @@ func (c *NatsTransport) handleDispatch(msg *nats.Msg, handler func(res http.Resp
 		header:              map[string][]string{},
 		buffer:              bytes.Buffer{},
 	}
+	
+	transportNatsDispatchDebug.Trace("Set up response writer and request reader")
 
 	req := &http.Request{
 		Method:           request.Method,
@@ -475,20 +535,25 @@ func (c *NatsTransport) handleDispatch(msg *nats.Msg, handler func(res http.Resp
 		return err
 	}
 
+	transportNatsDispatchDebug.Trace("Processing request with handler")
 	func() {
 		defer func() {
 			if err := recover(); err != nil {
+				transportNatsDispatchDebug.Tracef("Recovered from panic in handler: %v", err)
 				res.WriteError(err.(error))
 			}
 		}()
 
 		handler(res, req)
 	}()
-
+	
+	transportNatsDispatchDebug.Trace("Handler completed, sending response")
 	if err := res.End(); err != nil {
+		transportNatsDispatchDebug.Tracef("Failed to end response: %v", err)
 		return err
 	}
 
+	transportNatsDispatchDebug.Trace("Request handling completed successfully")
 	return nil
 }
 
