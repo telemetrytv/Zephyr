@@ -54,7 +54,7 @@ func (c *ServiceClient) Do(req *http.Request) (*http.Response, error) {
 	}
 
 	response := responseRecorder.Result()
-	clientRequestDebug.Tracef("Response from %s: status=%d, contentLength=%d", 
+	clientRequestDebug.Tracef("Response from %s: status=%d, contentLength=%d",
 		c.Name, response.StatusCode, response.ContentLength)
 
 	return response, nil
@@ -84,6 +84,7 @@ func (c *ServiceClient) Post(servicePath string, contentType string, body io.Rea
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("Content-Type", contentType)
 	return c.Do(req)
 }
 
