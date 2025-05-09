@@ -81,10 +81,10 @@ func (c *ServiceClient) Head(servicePath string) (*http.Response, error) {
 // Post sends a POST request to the service.
 func (c *ServiceClient) Post(servicePath string, contentType string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequest(http.MethodPost, servicePath, body)
-	req.Header.Set("Content-Type", contentType)
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("Content-Type", contentType)
 	return c.Do(req)
 }
 
